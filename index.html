@@ -48,7 +48,7 @@ const S={sel:{},joins:[],set:{},menu:[],orders:[],staff:[],cart:{},nm:'',tb:'',m
 const mem0={},store={g(k){try{const v=localStorage.getItem(k);if(v!==null)return v}catch(e){}return mem0[k]??null},s(k,v){mem0[k]=v;try{localStorage.setItem(k,v)}catch(e){}}};
 try{S.me=JSON.parse(store.g('me')||'null')}catch(e){}
 /* ===== Koneksi ke Google Apps Script (database = Google Spreadsheet) ===== */
-const API='PASTE_APPS_SCRIPT_WEB_APP_URL_HERE';
+const API='https://script.google.com/macros/s/AKfycbziOsbSo9RIIP1-HzalNtqZcCT4SQp_IbOrUPLAdpCmIxAilmKnVggc2afaONV2J9Wo/exec';
 const GS=typeof google!=='undefined'&&google.script&&google.script.run;
 async function rpc(a){const q={...a,tok:store.g('tok')||''};let j;
  if(GS)j=await new Promise((ok,no)=>google.script.run.withSuccessHandler(ok).withFailureHandler(e=>no(new Error(e&&e.message||e))).api(JSON.stringify(q)));
