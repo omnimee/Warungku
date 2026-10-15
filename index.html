@@ -60,7 +60,7 @@ function makeDb(){
  async function sync(){const j=await rpc({a:'sync',vers});for(const c in j.cols){vers[c]=j.cols[c].v;if(j.cols[c].docs){data[c]=j.cols[c].docs;emit(c)}}}
  const w=async(a,c,id,d)=>{const j=await rpc({a,c,id,d});await sync();return j};
  const snap=c=>({docs:(data[c]||[]).map(d=>({id:d.id,data:()=>{const{id,...r}=d;return r}}))});
- const loop=async()=>{const pg=/^#\/panggil/.test(location.hash);if(!document.hidden||pg){try{await sync()}catch(e){}}setTimeout(loop,pg?2000:/^#\/staff/.test(location.hash)||store.g('oid')?4000:12000)};
+ const loop=async()=>{if(!document.hidden){try{await sync()}catch(e){}}setTimeout(loop,/^#\/(staff|panggil)/.test(location.hash)||store.g('oid')?4000:12000)};
  return{init:async()=>{await sync();setTimeout(loop,4000)},
   collection:c=>({onSnapshot(cb){(subs[c]=subs[c]||[]).push(()=>cb(snap(c)));cb(snap(c))},add:d=>w('add',c,null,d)}),
   doc:p=>{const[c,id]=p.split('/');return{onSnapshot(cb){const f=()=>{const d=(data[c]||[]).find(x=>x.id===id);cb({exists:!!d,data:()=>{if(!d)return{};const{id:_,...r}=d;return r}})};(subs[c]=subs[c]||[]).push(f);f()},update:d=>w('update',c,id,d),set:d=>w('set',c,id,d),delete:()=>w('delete',c,id)}}}}
@@ -121,15 +121,14 @@ function track(o){
  return `<div class="card"><b>Pesanan #${o.no}</b>${o.add?' ➕ tambahan':''} · ${E(o.name)}${o.type==='ta'?' · 🛍 Take away':' · Meja '+E(o.table)}<div class="steps">${lb.map((s,k)=>`<div class="${k<=i?'on':''}"><i>${s.split(' ')[0]}</i>${s.split(' ')[1]}</div>`).join('')}</div><p><b>${f}</b></p>${o.items.map(x=>`<div>${x.qty}× ${E(x.name)}</div>`).join('')}<p>Total <b>${R(o.total)}</b> · ${o.paid?'<span style="color:var(--ok)">Sudah dibayar</span>':'Belum dibayar'}</p></div>${o.status==='bayar'||o.status==='verif'?payCard(o):''}<button class="pri" onclick="S.prev='${o.no}';store.s('oid','');render()">+ Tambah pesanan</button>`}
 /* ===== SUARA ===== */
 const sp={on:false,seen:{}};
-document.addEventListener('visibilitychange',()=>{if(sp.on&&!document.hidden)try{navigator.wakeLock.request('screen')}catch(e){}});
 function say(t){try{const u=new SpeechSynthesisUtterance(t);u.lang='id-ID';u.rate=.9;const v=speechSynthesis.getVoices().find(x=>x.lang&&x.lang.toLowerCase().startsWith('id'));if(v)u.voice=v;speechSynthesis.speak(u)}catch(e){}}
 const callTxt=o=>`Pesanan ${o.add?'tambahan ':''}atas nama ${o.name}, ${o.type==='ta'?'bawa pulang':'meja '+o.table}, sudah siap. Silakan diambil di counter.`;
 function ann(){if(!sp.on)return;S.orders.filter(o=>o.status==='selesai').sort((a,b)=>a.ce-b.ce).forEach(o=>{const k=o.ce+':'+(o.calls||0);if(sp.seen[o.id]!==k){sp.seen[o.id]=k;say(callTxt(o));say(callTxt(o))}})}
-function spOn(){sp.on=true;try{navigator.wakeLock&&navigator.wakeLock.request('screen')}catch(e){}try{speechSynthesis.getVoices();speechSynthesis.cancel()}catch(e){}S.orders.filter(o=>o.status==='selesai').forEach(o=>sp.seen[o.id]=o.ce+':'+(o.calls||0));say('Suara pengumuman aktif');render()}
+function spOn(){sp.on=true;S.orders.filter(o=>o.status==='selesai').forEach(o=>sp.seen[o.id]=o.ce+':'+(o.calls||0));say('Suara pengumuman aktif');render()}
 function notify(){const o=S.orders.find(x=>x.id===store.g('oid'));if(o&&o.status==='selesai'&&store.g('said')!==o.id+o.ce){store.s('said',o.id+o.ce);say(`Pesanan atas nama ${o.name} sudah siap. Silakan diambil di counter.`);try{navigator.vibrate&&navigator.vibrate([200,100,200])}catch(e){}}}
 function panggil(){
  const rd=S.orders.filter(o=>o.status==='selesai').sort((a,b)=>a.ce-b.ce),pr=S.orders.filter(o=>o.status==='baru'||o.status==='dimasak').sort((a,b)=>a.at-b.at);
- return `${sp.on?'<small>🔊 Suara aktif · biarkan halaman ini terbuka & layar menyala</small>':'<button class="pri" onclick="spOn()">🔊 Aktifkan suara pengumuman</button>'}<h3>Siap diambil</h3>${rd.map(o=>`<div class="card" style="font-size:26px"><b>${E(o.name)}</b> · ${o.type==='ta'?'🛍 Take away':'Meja '+E(o.table)} <small>#${o.no}</small></div>`).join('')||'<p class="mu">Belum ada.</p>'}<h3>Sedang diproses</h3><div>${pr.map(o=>`<span class="chip ${o.status}" style="font-size:18px;margin:3px">${E(o.name)}</span>`).join(' ')||'<small>Tidak ada.</small>'}</div>`}
+ return `${sp.on?'<small>🔊 Suara aktif</small>':'<button class="pri" onclick="spOn()">🔊 Aktifkan suara pengumuman</button>'}<h3>Siap diambil</h3>${rd.map(o=>`<div class="card" style="font-size:26px"><b>${E(o.name)}</b> · ${o.type==='ta'?'🛍 Take away':'Meja '+E(o.table)} <small>#${o.no}</small></div>`).join('')||'<p class="mu">Belum ada.</p>'}<h3>Sedang diproses</h3><div>${pr.map(o=>`<span class="chip ${o.status}" style="font-size:18px;margin:3px">${E(o.name)}</span>`).join(' ')||'<small>Tidak ada.</small>'}</div>`}
 /* ===== STAF ===== */
 function staff(){
  if(!S.me)return `<div class="card"><b>Masuk staf</b> <a class="mu" href="#/" style="float:right">← Menu</a><select id="ls"><option value="_o">Pemilik</option>${S.staff.map(s=>`<option value="${s.id}">${E(s.name)} (${s.role})</option>`).join('')}</select><input id="lp" type="password" inputmode="numeric" placeholder="PIN">${S.set.hasPin?'':'<small>PIN awal pemilik: 1234 (ganti di Pengaturan)</small>'}<button class="pri" onclick="login()">Masuk</button></div>`;
