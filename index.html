@@ -42,16 +42,20 @@ body.pg #app{max-width:1000px}
 </style></head><body><div id="app">Memuat…</div><div id="rcw" hidden></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script>
+const INIT={},APP_URL='';
 const $=s=>document.querySelector(s),E=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])),R=n=>'Rp'+Number(n||0).toLocaleString('id-ID'),today=t=>t&&new Date(t).toDateString()===new Date().toDateString();
-const S={sel:{},joins:[],set:{},menu:[],orders:[],staff:[],cart:{},nm:'',tb:'',me:null,tab:'dapur',per:'hari',pay:null,rc:null,qt:'',url:location.href.split('#')[0],ready:false,err:false};
-const store={g(k){try{return localStorage.getItem(k)}catch(e){return null}},s(k,v){try{localStorage.setItem(k,v)}catch(e){}}};
+const S={sel:{},joins:[],set:{},menu:[],orders:[],staff:[],cart:{},nm:'',tb:'',me:null,tab:'dapur',per:'hari',pay:null,rc:null,qt:'',url:APP_URL||location.href.split('#')[0].split('?')[0],ready:false,err:false};
+const mem0={},store={g(k){try{const v=localStorage.getItem(k);if(v!==null)return v}catch(e){}return mem0[k]??null},s(k,v){mem0[k]=v;try{localStorage.setItem(k,v)}catch(e){}}};
 try{S.me=JSON.parse(store.g('me')||'null')}catch(e){}
 /* ===== Koneksi ke Google Apps Script (database = Google Spreadsheet) ===== */
 const API='PASTE_APPS_SCRIPT_WEB_APP_URL_HERE';
-async function rpc(a){const r=await fetch(API,{method:'POST',body:JSON.stringify({...a,tok:store.g('tok')||''}),redirect:'follow'}),j=await r.json();
+const GS=typeof google!=='undefined'&&google.script&&google.script.run;
+async function rpc(a){const q={...a,tok:store.g('tok')||''};let j;
+ if(GS)j=await new Promise((ok,no)=>google.script.run.withSuccessHandler(ok).withFailureHandler(e=>no(new Error(e&&e.message||e))).api(JSON.stringify(q)));
+ else{const r=await fetch(API,{method:'POST',body:JSON.stringify(q),redirect:'follow'});j=await r.json()}
  if(j.err){if(j.err==='auth'){store.s('tok','');store.s('me','');S.me=null}throw new Error(j.err==='auth'?'Sesi habis atau tidak punya izin. Masuk staf lagi.':j.err)}return j}
 function makeDb(){
- if(!API||API.startsWith('PASTE'))return null;
+ if(!GS&&(!API||API.startsWith('PASTE')))return null;
  const vers={},data={},subs={},emit=c=>(subs[c]||[]).forEach(f=>f());
  async function sync(){const j=await rpc({a:'sync',vers});for(const c in j.cols){vers[c]=j.cols[c].v;if(j.cols[c].docs){data[c]=j.cols[c].docs;emit(c)}}}
  const w=async(a,c,id,d)=>{const j=await rpc({a,c,id,d});await sync();return j};
@@ -61,6 +65,8 @@ function makeDb(){
   collection:c=>({onSnapshot(cb){(subs[c]=subs[c]||[]).push(()=>cb(snap(c)));cb(snap(c))},add:d=>w('add',c,null,d)}),
   doc:p=>{const[c,id]=p.split('/');return{onSnapshot(cb){const f=()=>{const d=(data[c]||[]).find(x=>x.id===id);cb({exists:!!d,data:()=>{if(!d)return{};const{id:_,...r}=d;return r}})};(subs[c]=subs[c]||[]).push(f);f()},update:d=>w('update',c,id,d),set:d=>w('set',c,id,d),delete:()=>w('delete',c,id)}}}}
 let db=null;
+const QS=new URLSearchParams(location.search),P=k=>INIT[k]??QS.get(k);
+if(P('staff'))location.hash='#/staff';else if(P('panggil'))location.hash='#/panggil';else if(P('ta'))location.hash='#/ta';else if(P('m'))location.hash='#/m/'+P('m');
 const m0=location.hash.match(/^#\/m\/(.+)/);if(m0)S.tb=decodeURIComponent(m0[1]);S.tp=/^#\/ta/.test(location.hash)?'ta':'dine';
 window.onerror=(m,u,l)=>{const a=document.getElementById('app');if(a)a.insertAdjacentHTML('afterbegin','<p style="color:#b91c1c">Error: '+m+' (baris '+l+')</p>')};
 window.onunhandledrejection=e=>{const r=e.reason||{};alert('Gagal: '+(r.code?r.code+' - ':'')+(r.message||r))};
@@ -77,12 +83,12 @@ const head=()=>`<div class="hd"><div class="lg" onclick="lgTap()">${logo(S.set.l
 function render(){
  document.body.classList.toggle('rc',!!S.rc);document.title=S.set.name||'Warung';
  const st=location.hash.startsWith('#/staff'),pg=location.hash.startsWith('#/panggil');document.body.classList.toggle('pg',pg);let b;
- if(S.err)b='<p>Tidak bisa terhubung ke server (Apps Script). Periksa koneksi internet atau pengaturan alamat API di web/index.html.</p>'+(S.why?'<small>'+E(S.why)+'</small>':'');
+ if(S.err)b='<p>Tidak bisa terhubung ke server (Apps Script). Periksa koneksi internet atau pengaturan alamat API di index.html.</p>'+(S.why?'<small>'+E(S.why)+'</small>':'');
  else if(!S.ready)b='Memuat…';else b=st?staff():pg?panggil():cust();
  const c0=$('.chips'),sl=c0?c0.scrollLeft:0;$('#app').innerHTML=head()+b;const c2=$('.chips');if(c2){c2.scrollLeft=sl;const k=c2.querySelector('.on');if(k){if(k.offsetLeft<c2.scrollLeft)c2.scrollLeft=k.offsetLeft-8;else if(k.offsetLeft+k.offsetWidth>c2.scrollLeft+c2.clientWidth)c2.scrollLeft=k.offsetLeft+k.offsetWidth-c2.clientWidth+8}}
  if(S.ready){if(pg)ann();else if(!st)notify()}
  const rw=$('#rcw');rw.hidden=!S.rc;rw.innerHTML=S.rc?receipt(S.rc):'';
- const q=$('#qr');if(q&&typeof QRCode!=='undefined'){q.innerHTML='';new QRCode(q,{text:S.url+(S.qta?'#/ta':'#/m/'+S.qt),width:200,height:200})}
+ const q=$('#qr');if(q&&typeof QRCode!=='undefined'){q.innerHTML='';new QRCode(q,{text:S.url+(S.qta?'?ta=1':'?m='+encodeURIComponent(S.qt)),width:200,height:200})}
 }
 window.onhashchange=render;
 /* ===== PEMBELI ===== */
@@ -192,5 +198,5 @@ function lgUp(i){const f=i.files[0];if(!f)return;const r=new FileReader();r.onlo
 function qrUp(i){const f=i.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{const im=new Image();im.onload=()=>{const c=document.createElement('canvas'),s=Math.min(1,320/Math.max(im.width,im.height));c.width=im.width*s;c.height=im.height*s;c.getContext('2d').drawImage(im,0,0,c.width,c.height);S.qr=c.toDataURL('image/png');$('#qrp').innerHTML='<img src="'+S.qr+'" alt="QRIS" style="width:140px;border-radius:8px">'};im.src=r.result};r.readAsDataURL(f)}
 async function saveS(){await db.doc('settings/main').set({name:$('#sn').value.trim(),logo:S.lg??$('#sl').value.trim(),pin:$('#sp').value.trim(),rek:$('#sr').value.trim(),koki:+$('#sk').value||2,qris:S.qr??S.set.qris??''});S.lg=undefined;S.qr=undefined;alert('Tersimpan')}
 async function addS(){const n=$('#s_n').value.trim(),p=$('#s_p').value.trim();if(!n||!p)return alert('Isi nama & PIN');await db.collection('staff').add({name:n,role:$('#s_r').value,pin:p});render()}
-function qr(){return `<div class="card" style="text-align:center"><b>${S.qta?'QR Take Away (taruh di kasir)':'QR Meja '+E(S.qt)}</b><div id="qr" style="display:flex;justify-content:center;margin:10px"></div><small>Link menu: ${E(S.url)}${S.qta?'#/ta':'#/m/'+E(S.qt)}</small><br><small>Link staf: ${E(S.url)}#/staff<br>Layar panggil: ${E(S.url)}#/panggil</small><div class="noprint"><div class="tabs"><button class="${S.qta?'':'on'}" onclick="S.qta=0;render()">QR Meja</button><button class="${S.qta?'on':''}" onclick="S.qta=1;render()">QR Take Away</button></div><input placeholder="No. meja (kosongkan untuk umum)" value="${E(S.qt)}" onchange="S.qt=this.value;render()"><input placeholder="Alamat link aplikasi" value="${E(S.url)}" onchange="S.url=this.value;render()"><button class="pri" onclick="window.print()">🖨 Cetak QR</button></div></div>`}
+function qr(){return `<div class="card" style="text-align:center"><b>${S.qta?'QR Take Away (taruh di kasir)':'QR Meja '+E(S.qt)}</b><div id="qr" style="display:flex;justify-content:center;margin:10px"></div><small>Link menu: ${E(S.url)}${S.qta?'?ta=1':'?m='+E(S.qt)}</small><br><small>Link staf: ${E(S.url)}?staff=1<br>Layar panggil: ${E(S.url)}?panggil=1</small><div class="noprint"><div class="tabs"><button class="${S.qta?'':'on'}" onclick="S.qta=0;render()">QR Meja</button><button class="${S.qta?'on':''}" onclick="S.qta=1;render()">QR Take Away</button></div><input placeholder="No. meja (kosongkan untuk umum)" value="${E(S.qt)}" onchange="S.qt=this.value;render()"><input placeholder="Alamat link aplikasi" value="${E(S.url)}" onchange="S.url=this.value;render()"><button class="pri" onclick="window.print()">🖨 Cetak QR</button></div></div>`}
 </script></body></html>
